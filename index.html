@@ -310,6 +310,51 @@
   .feedback.correct { background: var(--correct-bg); color: var(--correct); border: 1px solid rgba(74,222,128,0.25); }
   .feedback.wrong { background: var(--wrong-bg); color: var(--wrong); border: 1px solid rgba(248,113,113,0.25); }
 
+  /* ─── Writing mode ─── */
+  .writing-hint {
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+  }
+  .writing-reveal {
+    margin-top: 1.2rem;
+    animation: fadeUp 0.3s ease;
+  }
+  .writing-answer {
+    text-align: center;
+    font-size: 1.8rem;
+    font-weight: 700;
+    padding: 1rem 0;
+    color: var(--accent);
+  }
+  .judge-buttons {
+    display: flex;
+    gap: 0.8rem;
+    margin-top: 0.8rem;
+  }
+  .btn-judge {
+    flex: 1;
+    padding: 0.85rem;
+    font-size: 1rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+  }
+  .btn-judge:hover { filter: brightness(1.1); transform: translateY(-1px); }
+  .btn-judge:active { transform: translateY(0); }
+  .btn-judge.correct {
+    background: var(--correct);
+    color: #fff;
+  }
+  .btn-judge.wrong {
+    background: var(--wrong);
+    color: #fff;
+  }
+
   /* ─── Results ─── */
   .result-score {
     text-align: center;
@@ -417,14 +462,11 @@
       <div class="card">
         <div class="card-title">🔤 出題モード</div>
         <div class="option-group" id="mode-options">
-          <button class="option-btn selected" data-mode="en2jp" onclick="selectMode(this)">
-            <span class="radio"></span> 英語 → 日本語
+          <button class="option-btn selected" data-mode="reading" onclick="selectMode(this)">
+            <span class="radio"></span> 読み取りテスト
           </button>
-          <button class="option-btn" data-mode="jp2en" onclick="selectMode(this)">
-            <span class="radio"></span> 日本語 → 英語
-          </button>
-          <button class="option-btn" data-mode="mix" onclick="selectMode(this)">
-            <span class="radio"></span> 混合（ランダム）
+          <button class="option-btn" data-mode="writing" onclick="selectMode(this)">
+            <span class="radio"></span> 書き取りテスト
           </button>
         </div>
       </div>
@@ -459,12 +501,25 @@
         <div class="word" id="q-word"></div>
       </div>
 
-      <div class="answer-input-row">
+      <div class="answer-input-row" id="typing-area">
         <input type="text" class="answer-input" id="answer-input" placeholder="答えを入力…" autocomplete="off">
         <button class="btn-submit" id="submit-btn" onclick="checkAnswer()">解答</button>
       </div>
 
       <div class="feedback" id="feedback"></div>
+
+      <!-- Writing mode -->
+      <div id="writing-area" style="display:none;">
+        <p class="writing-hint" id="writing-hint"></p>
+        <button class="btn-primary" id="reveal-btn" onclick="revealAnswer()">答え合わせ</button>
+        <div class="writing-reveal" id="writing-reveal" style="display:none;">
+          <div class="writing-answer" id="writing-answer"></div>
+          <div class="judge-buttons">
+            <button class="btn-judge correct" onclick="judgeAnswer(true)">正解</button>
+            <button class="btn-judge wrong" onclick="judgeAnswer(false)">不正解</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -497,7 +552,7 @@
 // ═══════════════════════════════════════════
 let wordLists = [];
 let selectedListIndex = 0;
-let selectedMode = 'en2jp';
+let selectedMode = 'reading';
 let allWords = [];
 let quizWords = [];
 let currentIndex = 0;
@@ -573,6 +628,7 @@ function startQuiz(words) {
   quizWords = shuffle(source).slice(0, count).map(w => {
     let dir = selectedMode;
     if (dir === 'mix') dir = Math.random() < 0.5 ? 'en2jp' : 'jp2en';
+    if (dir === 'writing' || dir === 'reading') dir = selectedMode;
     return { ...w, dir };
   });
   currentIndex = 0;
@@ -590,23 +646,44 @@ function showQuestion() {
   document.getElementById('q-score').textContent = `正解: ${correctCount}`;
   document.getElementById('progress-bar').style.width = `${((currentIndex) / total) * 100}%`;
 
+  const isSelfJudge = q.dir === 'writing' || q.dir === 'reading';
+  const typingArea = document.getElementById('typing-area');
+  const writingArea = document.getElementById('writing-area');
+
   if (q.dir === 'en2jp') {
     document.getElementById('q-direction').textContent = '英語 → 日本語';
     document.getElementById('q-word').textContent = q.en;
-  } else {
+  } else if (q.dir === 'jp2en') {
     document.getElementById('q-direction').textContent = '日本語 → 英語';
     document.getElementById('q-word').textContent = q.jp.join(', ');
+  } else if (q.dir === 'writing') {
+    document.getElementById('q-direction').textContent = '書き取りテスト';
+    document.getElementById('q-word').textContent = q.jp.join(', ');
+  } else {
+    document.getElementById('q-direction').textContent = '読み取りテスト';
+    document.getElementById('q-word').textContent = q.en;
   }
 
-  const input = document.getElementById('answer-input');
-  input.value = '';
-  input.className = 'answer-input';
-  input.disabled = false;
-  input.focus();
+  if (isSelfJudge) {
+    typingArea.style.display = 'none';
+    writingArea.style.display = 'block';
+    document.getElementById('writing-hint').textContent =
+      q.dir === 'reading' ? 'ノートに日本語を書いてから答え合わせしてね' : 'ノートに英語を書いてから答え合わせしてね';
+    document.getElementById('reveal-btn').style.display = 'block';
+    document.getElementById('writing-reveal').style.display = 'none';
+  } else {
+    typingArea.style.display = 'flex';
+    writingArea.style.display = 'none';
+    const input = document.getElementById('answer-input');
+    input.value = '';
+    input.className = 'answer-input';
+    input.disabled = false;
+    input.focus();
+    document.getElementById('submit-btn').textContent = '解答';
+  }
 
   document.getElementById('feedback').className = 'feedback';
   document.getElementById('feedback').style.display = 'none';
-  document.getElementById('submit-btn').textContent = '解答';
   answered = false;
 }
 
@@ -662,6 +739,28 @@ function checkAnswer() {
   }
 }
 
+function revealAnswer() {
+  const q = quizWords[currentIndex];
+  document.getElementById('reveal-btn').style.display = 'none';
+  document.getElementById('writing-answer').textContent = q.dir === 'reading' ? q.jp.join(', ') : q.en;
+  document.getElementById('writing-reveal').style.display = 'block';
+}
+
+function judgeAnswer(isCorrect) {
+  const q = quizWords[currentIndex];
+  if (isCorrect)
+    correctCount++;
+  else
+    wrongItems.push({ ...q, userAnswer: '(書き取り)' });
+
+  document.getElementById('q-score').textContent = `正解: ${correctCount}`;
+  currentIndex++;
+  if (currentIndex >= quizWords.length)
+    showResults();
+  else
+    showQuestion();
+}
+
 function showResults() {
   const total = quizWords.length;
   const pct = Math.round((correctCount / total) * 100);
@@ -715,6 +814,7 @@ function showScreen(id) {
 // Enter key = submit
 document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && document.getElementById('quiz-screen').classList.contains('active')) {
+    if (document.getElementById('writing-area').style.display !== 'none') return;
     checkAnswer();
   }
 });
