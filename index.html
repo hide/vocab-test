@@ -161,6 +161,28 @@
     font-size: 0.8rem;
   }
 
+  /* ─── List select ─── */
+  .list-select {
+    width: 100%;
+    padding: 0.85rem 1rem;
+    background: var(--surface2);
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 0.95rem;
+    font-family: inherit;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238b90a5' stroke-width='2' fill='none'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+  }
+  .list-select:focus { outline: none; border-color: var(--accent); }
+  .list-select option {
+    background: var(--surface);
+    color: var(--text);
+  }
+
   /* ─── Primary button ─── */
   .btn-primary {
     display: block;
@@ -388,7 +410,7 @@
       <!-- Word list selection -->
       <div class="card">
         <div class="card-title">📚 単語リスト</div>
-        <div class="option-group" id="list-options"></div>
+        <select class="list-select" id="list-select" onchange="selectList(this)"></select>
       </div>
 
       <!-- Mode selection -->
@@ -503,11 +525,9 @@ let answered = false;
 })();
 
 function renderListOptions() {
-  const container = document.getElementById('list-options');
-  container.innerHTML = wordLists.map((wl, i) =>
-    `<button class="option-btn${i === 0 ? ' selected' : ''}" data-idx="${i}" onclick="selectList(this)">
-      <span class="radio"></span> ${wl.title}
-    </button>`
+  const sel = document.getElementById('list-select');
+  sel.innerHTML = wordLists.map((wl, i) =>
+    `<option value="${i}">${wl.title}</option>`
   ).join('');
 }
 
@@ -524,10 +544,8 @@ async function loadWordList(index) {
 // ═══════════════════════════════════════════
 //  Setup interactions
 // ═══════════════════════════════════════════
-function selectList(btn) {
-  btn.parentElement.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
-  btn.classList.add('selected');
-  selectedListIndex = parseInt(btn.dataset.idx);
+function selectList(sel) {
+  selectedListIndex = parseInt(sel.value);
   loadWordList(selectedListIndex);
 }
 
