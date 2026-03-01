@@ -488,7 +488,7 @@ let answered = false;
 // ═══════════════════════════════════════════
 (async function init() {
   try {
-    const res = await fetch('wordlists.json');
+    const res = await fetch('tests/index.json');
     if (!res.ok) throw new Error('manifest not found');
     wordLists = await res.json();
     renderListOptions();
@@ -497,7 +497,7 @@ let answered = false;
     document.getElementById('setup-form').style.display = 'block';
   } catch (e) {
     document.getElementById('loading-lists').innerHTML =
-      `<div class="error-msg">⚠ 単語リストを読み込めませんでした。<br><small>wordlists.json と単語ファイルが同じディレクトリにあるか確認してください。</small></div>`;
+      `<div class="error-msg">⚠ 単語リストを読み込めませんでした。<br><small>tests/index.json と単語ファイルが tests ディレクトリにあるか確認してください。</small></div>`;
     console.error(e);
   }
 })();
@@ -512,7 +512,7 @@ function renderListOptions() {
 }
 
 async function loadWordList(index) {
-  const res = await fetch(wordLists[index].file);
+  const res = await fetch('tests/' + wordLists[index].file);
   if (!res.ok) throw new Error('word file not found');
   const data = await res.json();
   allWords = data.words;
@@ -577,7 +577,7 @@ function showQuestion() {
     document.getElementById('q-word').textContent = q.en;
   } else {
     document.getElementById('q-direction').textContent = '日本語 → 英語';
-    document.getElementById('q-word').textContent = q.jp;
+    document.getElementById('q-word').textContent = q.jp.join(', ');
   }
 
   const input = document.getElementById('answer-input');
@@ -604,11 +604,18 @@ function checkAnswer() {
     const userRaw = input.value.trim();
     if (!userRaw) return;
 
-    const correctAns = q.dir === 'en2jp' ? q.jp : q.en;
-    // Allow partial match: split by ・ or ／ or / or 、
-    const acceptList = correctAns.split(/[・／\/、]/).map(normalize);
     const userNorm = normalize(userRaw);
-    const isCorrect = acceptList.some(a => a === userNorm) || normalize(correctAns) === userNorm;
+    let isCorrect, displayAns;
+
+    if (q.dir === 'en2jp') {
+      // 英語→日本語: jp配列のいずれかに一致すれば正解
+      displayAns = q.jp.join(', ');
+      isCorrect = q.jp.some(ans => normalize(ans) === userNorm);
+    } else {
+      // 日本語→英語: 英単語に一致すれば正解
+      displayAns = q.en;
+      isCorrect = normalize(q.en) === userNorm;
+    }
 
     const fb = document.getElementById('feedback');
     if (isCorrect) {
@@ -619,7 +626,7 @@ function checkAnswer() {
     } else {
       input.classList.add('wrong');
       fb.className = 'feedback wrong show';
-      fb.innerHTML = `❌ 不正解　<strong>正解: ${correctAns}</strong>`;
+      fb.innerHTML = `❌ 不正解　<strong>正解: ${displayAns}</strong>`;
       wrongItems.push({ ...q, userAnswer: userRaw });
     }
     input.disabled = true;
@@ -657,7 +664,7 @@ function showResults() {
       `<div class="wrong-item">
         <div>
           <span class="en">${w.en}</span>
-          <span class="jp" style="margin-left:0.5rem;">— ${w.jp}</span>
+          <span class="jp" style="margin-left:0.5rem;">— ${w.jp.join(', ')}</span>
         </div>
         <div class="your-answer">あなた: ${w.userAnswer}</div>
       </div>`
