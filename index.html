@@ -906,7 +906,7 @@ function speak(text) {
   speechSynthesis.cancel();
   const utter = new SpeechSynthesisUtterance(text);
   utter.lang = 'en-US';
-  utter.rate = 1.0;
+  utter.rate = 0.8;
   if (femaleVoice) utter.voice = femaleVoice;
   speechSynthesis.speak(utter);
 }
