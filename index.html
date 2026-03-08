@@ -853,8 +853,11 @@ let wrongItems = [];
 let answered = false;
 
 function clearStats() {
-  if (!confirm('正答率データをすべてクリアしますか？')) return;
-  localStorage.removeItem('vocabtest_stats');
+  const listTitle = wordLists[selectedListIndex]?.title || '現在のリスト';
+  if (!confirm(`「${listTitle}」の正答率データをクリアしますか？`)) return;
+  const stats = loadAllStats();
+  delete stats[getListId()];
+  saveAllStats(stats);
   updateReviewHint();
 }
 
