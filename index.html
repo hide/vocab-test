@@ -748,6 +748,7 @@
       </div>
 
       <button class="btn-primary" id="start-btn" onclick="startQuiz()">テスト開始</button>
+      <button class="btn-secondary" onclick="generatePrintTest()">🖨️ 印刷用テストを作成</button>
     </div>
   </div>
 
@@ -1288,6 +1289,212 @@ function speakWord() {
 function speakWritingAnswer() {
   const q = quizWords[currentIndex];
   speak(q.en);
+}
+
+// ═══════════════════════════════════════════
+//  Print test (印刷用テスト)
+// ═══════════════════════════════════════════
+function generatePrintTest() {
+  // Build word pool (same logic as startQuiz)
+  let pool;
+  if (selectedRange === 'review') {
+    const threshold = parseInt(document.getElementById('review-threshold').value) || 60;
+    pool = getReviewWords(threshold);
+    if (pool.length === 0) { alert('復習対象の単語がありません！'); return; }
+  } else if (selectedRange === 'range') {
+    const start = Math.max(1, Math.min(parseInt(document.getElementById('q-start').value) || 1, allWords.length));
+    const end = Math.max(start, Math.min(parseInt(document.getElementById('q-end').value) || allWords.length, allWords.length));
+    pool = allWords.slice(start - 1, end);
+  } else
+    pool = allWords;
+
+  const count = Math.min(parseInt(document.getElementById('q-count').value) || 10, pool.length);
+  const questions = shuffle(pool).slice(0, count);
+  const listTitle = wordLists[selectedListIndex]?.title || '英単語テスト';
+  const isWriting = selectedMode === 'writing';
+  const modeLabel = isWriting ? '書き取りテスト（日本語→英語）' : '読み取りテスト（英語→日本語）';
+  const today = new Date().toLocaleDateString('ja-JP');
+
+  // Build questions HTML
+  const questionsHtml = questions.map((w, i) => {
+    const prompt = isWriting ? w.jp.join(', ') : w.en;
+    return `<div class="q-item">
+      <span class="num">${i + 1}.</span>
+      <span class="prompt">${prompt}</span>
+      <span class="answer-line"></span>
+    </div>`;
+  }).join('');
+
+  // Build answer key
+  const answersHtml = questions.map((w, i) => {
+    const prompt = isWriting ? w.jp.join(', ') : w.en;
+    const answer = isWriting ? w.en : w.jp.join(', ');
+    return `<div class="a-item">
+      <span class="num">${i + 1}.</span>
+      <span class="prompt">${prompt}</span>
+      <span class="answer-key">${answer}</span>
+    </div>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>${listTitle} - 印刷用テスト</title>
+<style>
+  @page {
+    size: A4;
+    margin: 12mm 15mm;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Helvetica Neue', 'Noto Sans JP', 'Hiragino Sans', sans-serif;
+    font-size: 10pt;
+    color: #222;
+    line-height: 1.4;
+  }
+  .page { page-break-after: always; }
+  .page:last-child { page-break-after: auto; }
+  .header {
+    text-align: center;
+    margin-bottom: 5mm;
+    padding-bottom: 3mm;
+    border-bottom: 2px solid #333;
+  }
+  .header h1 { font-size: 14pt; margin-bottom: 1.5mm; }
+  .header .meta { font-size: 8.5pt; color: #666; }
+  .name-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5mm;
+    font-size: 10pt;
+  }
+  .name-row .field {
+    display: flex;
+    align-items: baseline;
+    gap: 2mm;
+  }
+  .name-row .line {
+    display: inline-block;
+    width: 45mm;
+    border-bottom: 1px solid #999;
+  }
+  .score-box {
+    border: 2px solid #333;
+    padding: 2mm 5mm;
+    font-size: 11pt;
+    font-weight: 700;
+  }
+
+  /* ─── 2-column question list ─── */
+  .q-list {
+    columns: 2;
+    column-gap: 6mm;
+  }
+  .q-item {
+    display: flex;
+    align-items: baseline;
+    gap: 2mm;
+    padding: 2mm 0;
+    border-bottom: 1px solid #eee;
+    break-inside: avoid;
+  }
+  .num {
+    color: #999;
+    font-size: 8.5pt;
+    min-width: 6mm;
+    flex-shrink: 0;
+  }
+  .prompt {
+    font-weight: 500;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .answer-line {
+    flex: 1;
+    min-width: 20mm;
+    border-bottom: 1px solid #bbb;
+    margin-left: 1mm;
+    height: 1em;
+  }
+
+  /* ─── Answer key (2 columns) ─── */
+  .answer-page-title {
+    text-align: center;
+    font-size: 13pt;
+    font-weight: 700;
+    margin-bottom: 5mm;
+    padding-bottom: 3mm;
+    border-bottom: 2px solid #333;
+  }
+  .a-list {
+    columns: 2;
+    column-gap: 6mm;
+    font-size: 9pt;
+  }
+  .a-item {
+    padding: 1.5mm 0;
+    border-bottom: 1px solid #eee;
+    break-inside: avoid;
+    overflow: hidden;
+  }
+  .a-item .num { font-size: 8pt; }
+  .a-item .prompt { font-weight: 400; color: #666; margin-right: 1mm; }
+  .answer-key { color: #c00; font-weight: 600; }
+
+  @media screen {
+    body { max-width: 210mm; margin: 10mm auto; padding: 10mm; }
+    .no-print { position: fixed; top: 10px; right: 10px; z-index: 100; }
+    .no-print button {
+      padding: 8px 20px;
+      font-size: 14px;
+      background: #4a90d9;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .no-print button:hover { background: #3a7bc8; }
+  }
+  @media print {
+    .no-print { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="no-print">
+  <button onclick="window.print()">🖨️ 印刷する</button>
+</div>
+
+<!-- 問題ページ -->
+<div class="page">
+  <div class="header">
+    <h1>${listTitle}</h1>
+    <div class="meta">${modeLabel}　|　${count}問　|　${today}</div>
+  </div>
+  <div class="name-row">
+    <div class="field">名前: <span class="line"></span></div>
+    <div class="score-box">　　/　${count}</div>
+  </div>
+  <div class="q-list">${questionsHtml}</div>
+</div>
+
+<!-- 解答ページ -->
+<div class="page">
+  <div class="answer-page-title">解答</div>
+  <div class="a-list">${answersHtml}</div>
+</div>
+
+</body>
+</html>`;
+
+  const printWindow = window.open('', '_blank');
+  if (printWindow) {
+    printWindow.document.write(html);
+    printWindow.document.close();
+  } else
+    alert('ポップアップがブロックされています。ブラウザの設定でポップアップを許可してください。');
 }
 
 // ═══════════════════════════════════════════
