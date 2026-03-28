@@ -330,6 +330,70 @@
   }
   .btn-submit:hover { filter: brightness(1.1); }
 
+  /* ─── Virtual keyboard ─── */
+  .vk-area { display: none; margin-top: 1rem; }
+  .vk-display-row {
+    display: flex;
+    gap: 0.6rem;
+    margin-bottom: 0.8rem;
+  }
+  .vk-display {
+    flex: 1;
+    min-height: 2.8rem;
+    padding: 0.7rem 1rem;
+    background: var(--surface2);
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 1.2rem;
+    font-family: 'DM Sans', monospace;
+    letter-spacing: 0.05em;
+    display: flex;
+    align-items: center;
+    word-break: break-all;
+  }
+  .vk-display.correct { border-color: var(--correct); background: var(--correct-bg); }
+  .vk-display.wrong { border-color: var(--wrong); background: var(--wrong-bg); }
+  .vk-cursor {
+    display: inline-block;
+    width: 2px;
+    height: 1.2em;
+    background: var(--accent);
+    animation: blink 1s step-end infinite;
+    margin-left: 1px;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+  .vk-row {
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+    margin-bottom: 4px;
+  }
+  .vk-key {
+    min-width: 32px;
+    height: 40px;
+    background: var(--surface2);
+    border: 1.5px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 0.95rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.12s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 6px;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+  .vk-key:hover { border-color: var(--accent); background: var(--accent-glow); }
+  .vk-key:active { transform: scale(0.93); }
+  .vk-key.wide { min-width: 56px; font-size: 0.8rem; }
+  .vk-key.backspace { min-width: 52px; }
+  .vk-keys-disabled .vk-key { opacity: 0.4; pointer-events: none; }
+
   .feedback {
     margin-top: 1rem;
     padding: 0.8rem 1rem;
@@ -795,6 +859,50 @@
         <button class="btn-submit" id="submit-btn" onclick="checkAnswer()">解答</button>
       </div>
 
+      <!-- Virtual keyboard mode -->
+      <div class="vk-area" id="vk-area">
+        <div class="vk-display-row">
+          <div class="vk-display" id="vk-display"><span class="vk-cursor"></span></div>
+          <button class="btn-submit" id="vk-submit-btn" onclick="vkSubmit()">解答</button>
+        </div>
+        <div id="vk-keys">
+          <div class="vk-row">
+            <button class="vk-key" onclick="vkType('q')">Q</button>
+            <button class="vk-key" onclick="vkType('w')">W</button>
+            <button class="vk-key" onclick="vkType('e')">E</button>
+            <button class="vk-key" onclick="vkType('r')">R</button>
+            <button class="vk-key" onclick="vkType('t')">T</button>
+            <button class="vk-key" onclick="vkType('y')">Y</button>
+            <button class="vk-key" onclick="vkType('u')">U</button>
+            <button class="vk-key" onclick="vkType('i')">I</button>
+            <button class="vk-key" onclick="vkType('o')">O</button>
+            <button class="vk-key" onclick="vkType('p')">P</button>
+          </div>
+          <div class="vk-row">
+            <button class="vk-key" onclick="vkType('a')">A</button>
+            <button class="vk-key" onclick="vkType('s')">S</button>
+            <button class="vk-key" onclick="vkType('d')">D</button>
+            <button class="vk-key" onclick="vkType('f')">F</button>
+            <button class="vk-key" onclick="vkType('g')">G</button>
+            <button class="vk-key" onclick="vkType('h')">H</button>
+            <button class="vk-key" onclick="vkType('j')">J</button>
+            <button class="vk-key" onclick="vkType('k')">K</button>
+            <button class="vk-key" onclick="vkType('l')">L</button>
+          </div>
+          <div class="vk-row">
+            <button class="vk-key backspace" onclick="vkBackspace()">&#9003;</button>
+            <button class="vk-key" onclick="vkType('z')">Z</button>
+            <button class="vk-key" onclick="vkType('x')">X</button>
+            <button class="vk-key" onclick="vkType('c')">C</button>
+            <button class="vk-key" onclick="vkType('v')">V</button>
+            <button class="vk-key" onclick="vkType('b')">B</button>
+            <button class="vk-key" onclick="vkType('n')">N</button>
+            <button class="vk-key" onclick="vkType('m')">M</button>
+            <button class="vk-key wide" onclick="vkType(' ')">SPACE</button>
+          </div>
+        </div>
+      </div>
+
       <div class="feedback" id="feedback"></div>
 
       <!-- Writing mode -->
@@ -866,6 +974,8 @@ let currentIndex = 0;
 let correctCount = 0;
 let wrongItems = [];
 let answered = false;
+let vkBuffer = '';
+let useVirtualKeyboard = false;
 
 function clearStats() {
   const listTitle = wordLists[selectedListIndex]?.title || '現在のリスト';
@@ -1059,8 +1169,10 @@ function showQuestion() {
 
   const isSelfJudge = (q.dir === 'writing' || q.dir === 'reading') && selectedInputMethod === 'paper';
   const isScreenInput = (q.dir === 'writing' || q.dir === 'reading') && selectedInputMethod === 'screen';
+  useVirtualKeyboard = isScreenInput && q.dir === 'writing';
   const typingArea = document.getElementById('typing-area');
   const writingArea = document.getElementById('writing-area');
+  const vkArea = document.getElementById('vk-area');
 
   const speakBtn = document.getElementById('q-speak-btn');
 
@@ -1084,14 +1196,25 @@ function showQuestion() {
 
   if (isSelfJudge) {
     typingArea.style.display = 'none';
+    vkArea.style.display = 'none';
     writingArea.style.display = 'block';
     document.getElementById('writing-hint').textContent =
       q.dir === 'reading' ? 'ノートに日本語を書いてから答え合わせしてね' : 'ノートに英語を書いてから答え合わせしてね';
     document.getElementById('reveal-btn').style.display = 'block';
     document.getElementById('writing-reveal').style.display = 'none';
+  } else if (useVirtualKeyboard) {
+    typingArea.style.display = 'none';
+    writingArea.style.display = 'none';
+    vkArea.style.display = 'block';
+    vkBuffer = '';
+    document.getElementById('vk-display').className = 'vk-display';
+    vkRender();
+    document.getElementById('vk-keys').classList.remove('vk-keys-disabled');
+    document.getElementById('vk-submit-btn').textContent = '解答';
   } else {
     typingArea.style.display = 'flex';
     writingArea.style.display = 'none';
+    vkArea.style.display = 'none';
     const input = document.getElementById('answer-input');
     input.value = '';
     input.className = 'answer-input';
@@ -1106,6 +1229,75 @@ function showQuestion() {
   document.getElementById('feedback').className = 'feedback';
   document.getElementById('feedback').style.display = 'none';
   answered = false;
+}
+
+// ═══════════════════════════════════════════
+//  Virtual Keyboard
+// ═══════════════════════════════════════════
+function vkType(ch) {
+  if (answered) return;
+  vkBuffer += ch;
+  vkRender();
+}
+
+function vkBackspace() {
+  if (answered) return;
+  vkBuffer = vkBuffer.slice(0, -1);
+  vkRender();
+}
+
+function vkRender() {
+  const display = document.getElementById('vk-display');
+  const cursor = answered ? '' : '<span class="vk-cursor"></span>';
+  display.innerHTML = vkBuffer + cursor;
+}
+
+function vkSubmit() {
+  if (!answered) {
+    if (!vkBuffer.trim()) return;
+    // Use checkAnswer logic but with vkBuffer as input
+    const q = quizWords[currentIndex];
+    const userRaw = vkBuffer.trim();
+    const userNorm = normalize(userRaw);
+    let isCorrect, displayAns;
+
+    if (q.dir === 'reading') {
+      displayAns = q.jp.join(', ');
+      isCorrect = q.jp.some(ans => normalize(ans) === userNorm);
+    } else {
+      displayAns = q.en;
+      isCorrect = normalize(q.en) === userNorm;
+    }
+
+    const fb = document.getElementById('feedback');
+    fb.style.display = '';
+    const fullAns = `${q.en} = ${q.jp.join(', ')}`;
+    const display = document.getElementById('vk-display');
+    if (isCorrect) {
+      correctCount++;
+      display.className = 'vk-display correct';
+      fb.className = 'feedback correct show';
+      fb.innerHTML = `⭕ 正解！　<strong>${fullAns}</strong>`;
+      recordAnswer(q.en, true);
+    } else {
+      display.className = 'vk-display wrong';
+      fb.className = 'feedback wrong show';
+      fb.innerHTML = `❌ 不正解　<strong>正解: ${fullAns}</strong>`;
+      wrongItems.push({ ...q, userAnswer: userRaw });
+      recordAnswer(q.en, false);
+    }
+    document.getElementById('vk-keys').classList.add('vk-keys-disabled');
+    vkRender();
+    document.getElementById('q-score').textContent = `正解: ${correctCount}`;
+    document.getElementById('vk-submit-btn').textContent = currentIndex < quizWords.length - 1 ? '次へ' : '結果を見る';
+    answered = true;
+  } else {
+    currentIndex++;
+    if (currentIndex >= quizWords.length)
+      showResults();
+    else
+      showQuestion();
+  }
 }
 
 function normalize(s) {
@@ -1535,6 +1727,7 @@ function showScreen(id) {
 document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && document.getElementById('quiz-screen').classList.contains('active')) {
     if (document.getElementById('writing-area').style.display !== 'none') return;
+    if (useVirtualKeyboard) { vkSubmit(); return; }
     checkAnswer();
   }
 });
