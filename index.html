@@ -708,6 +708,19 @@
         </div>
       </div>
 
+      <!-- Input method selection -->
+      <div class="card" id="input-method-card">
+        <div class="card-title">✏️ 回答方式</div>
+        <div class="option-group" id="input-method-options">
+          <button class="option-btn selected" data-input="paper" onclick="selectInputMethod(this)">
+            <span class="radio"></span> 紙に書く
+          </button>
+          <button class="option-btn" data-input="screen" onclick="selectInputMethod(this)">
+            <span class="radio"></span> 画面で入力
+          </button>
+        </div>
+      </div>
+
       <!-- Range mode -->
       <div class="card">
         <div class="card-title">📝 出題範囲</div>
@@ -845,6 +858,7 @@
 let wordLists = [];
 let selectedListIndex = 0;
 let selectedMode = 'writing';
+let selectedInputMethod = 'paper';
 let selectedRange = 'all';
 let allWords = [];
 let quizWords = [];
@@ -960,6 +974,12 @@ function selectMode(btn) {
   selectedMode = btn.dataset.mode;
 }
 
+function selectInputMethod(btn) {
+  btn.parentElement.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  selectedInputMethod = btn.dataset.input;
+}
+
 function selectRange(btn) {
   btn.parentElement.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
   btn.classList.add('selected');
@@ -1037,7 +1057,8 @@ function showQuestion() {
   document.getElementById('q-score').textContent = `正解: ${correctCount}`;
   document.getElementById('progress-bar').style.width = `${((currentIndex) / total) * 100}%`;
 
-  const isSelfJudge = q.dir === 'writing' || q.dir === 'reading';
+  const isSelfJudge = (q.dir === 'writing' || q.dir === 'reading') && selectedInputMethod === 'paper';
+  const isScreenInput = (q.dir === 'writing' || q.dir === 'reading') && selectedInputMethod === 'screen';
   const typingArea = document.getElementById('typing-area');
   const writingArea = document.getElementById('writing-area');
 
@@ -1075,6 +1096,9 @@ function showQuestion() {
     input.value = '';
     input.className = 'answer-input';
     input.disabled = false;
+    input.placeholder = isScreenInput
+      ? (q.dir === 'writing' ? '英語を入力…' : '日本語を入力…')
+      : '答えを入力…';
     input.focus();
     document.getElementById('submit-btn').textContent = '解答';
   }
@@ -1099,27 +1123,29 @@ function checkAnswer() {
     const userNorm = normalize(userRaw);
     let isCorrect, displayAns;
 
-    if (q.dir === 'en2jp') {
-      // 英語→日本語: jp配列のいずれかに一致すれば正解
+    if (q.dir === 'en2jp' || q.dir === 'reading') {
+      // 英語→日本語 / 読み取り(画面入力): jp配列のいずれかに一致すれば正解
       displayAns = q.jp.join(', ');
       isCorrect = q.jp.some(ans => normalize(ans) === userNorm);
     } else {
-      // 日本語→英語: 英単語に一致すれば正解
+      // 日本語→英語 / 書き取り(画面入力): 英単語に一致すれば正解
       displayAns = q.en;
       isCorrect = normalize(q.en) === userNorm;
     }
 
     const fb = document.getElementById('feedback');
+    fb.style.display = '';
+    const fullAns = `${q.en} = ${q.jp.join(', ')}`;
     if (isCorrect) {
       correctCount++;
       input.classList.add('correct');
       fb.className = 'feedback correct show';
-      fb.textContent = '⭕ 正解！';
+      fb.innerHTML = `⭕ 正解！　<strong>${fullAns}</strong>`;
       recordAnswer(q.en, true);
     } else {
       input.classList.add('wrong');
       fb.className = 'feedback wrong show';
-      fb.innerHTML = `❌ 不正解　<strong>正解: ${displayAns}</strong>`;
+      fb.innerHTML = `❌ 不正解　<strong>正解: ${fullAns}</strong>`;
       wrongItems.push({ ...q, userAnswer: userRaw });
       recordAnswer(q.en, false);
     }
